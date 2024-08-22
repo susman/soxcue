@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "soxcue"
+version = "0.0.1"
+description = "Convert cue sheet + audio file(s) to tagged tracks"
+authors = ["Igor Susman <igor@susman.dev>"]
+license = "0BSD"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+chardet = "^5.2.0"
+mutagen = "^1.47.0"
+rich = "^13.7.1"
+mediafile = "^0.12.0"
+
+[tool.poetry.scripts]
+soxcue = "soxcue.cmd:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
