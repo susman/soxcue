@@ -19,9 +19,7 @@ class SoxJobsError(Exception):
 @dataclass
 class SoxProperties:
     """
-    Set SoX executable name
-    requested compression level for the output files
-    collect audio formats supported by SoX
+    SoX properties
     """
 
     exe_name: str
@@ -29,6 +27,9 @@ class SoxProperties:
     supported_formats: list = field(init=False)
 
     def __post_init__(self) -> list:
+        """
+        Collect audio file formats supported by SoX
+        """
         formats_str = "AUDIO FILE FORMATS: "
         try:
             self.supported_formats = (
@@ -54,8 +55,7 @@ class SoxProperties:
 class CueSheet:
     """
     CueMetaData and TrackProperties as returned by CueParser
-    with filesystem path to cue file and cover image, if found
-    this is the main exchange object
+    with filesystem path to cue file and a cover image if found
     """
 
     metadata: CueMetaData
@@ -66,27 +66,24 @@ class CueSheet:
 
 @dataclass
 class Config:
+    """
+    Job config from cmdline/defaults
+    """
+
     src_path: Path
     dst_dir: Path | None
     time_wait: int
-    dst_aformat: str
-    format_spec: str
+    enc_format: str
+    naming_spec: str
     cue_encoding: str | None
     cmd_comment: str | None
 
-
-@dataclass
-class JobSpec:
-    """
-    Current job definition
-    """
-
-    sox_props: SoxProperties
-    config: Config
-
     def get_comments_dict(self) -> dict:
-        if self.config.cmd_comment:
-            comments = re.split(r"([A-Z]*:\s)", self.config.cmd_comment)[1:]
+        """
+        Comments from cmdline args
+        """
+        if self.cmd_comment:
+            comments = re.split(r"([A-Z]*:\s)", self.cmd_comment)[1:]
             return {
                 k.strip().strip(":"): v.strip()
                 for k, v in zip(comments[::2], comments[1::2])
@@ -96,64 +93,61 @@ class JobSpec:
 
 class SoxJobs:
     """
-    Generate appropriate SoX command lines
+    Generate SoX cmd args
     """
 
     def __init__(
         self,
-        job_spec: JobSpec,
+        config: Config,
+        sox_props: SoxProperties,
     ):
         """
         Verify requested destination format is supported
-        verify input path exists
-        generate CueSheet objects
+        Verify input path exists
+        Generate CueSheet objects
         """
 
-        if job_spec.config.dst_aformat not in job_spec.sox_props.supported_formats:
+        if config.enc_format not in sox_props.supported_formats:
             raise SoxJobsError(
-                f"Destination format '{job_spec.dst_aformat}' "
-                f"is not supported by {job_spec.sox_props.exe_name}"
+                f"Destination format '{config.enc_format}' "
+                f"is not supported by {sox_props.exe_name}"
             )
 
-        if not job_spec.config.src_path.exists():
-            raise SoxJobsError(f"Source path '{job_spec.src_path}' not found")
+        if not config.src_path.exists():
+            raise SoxJobsError(f"Source path '{config.src_path}' not found")
 
-        self.cue_sheets: list[CueSheet] = [
+        self.sox_props = sox_props
+        self.config = config
+        self.cue_sheets = [
             CueSheet(
                 metadata=cue_tracks[0],
                 tracks=cue_tracks[1],
                 cue_path=(
-                    cue_cover["cue"]
-                    if job_spec.config.src_path.is_dir()
-                    else job_spec.config.src_path
+                    cue_cover["cue"] if config.src_path.is_dir() else config.src_path
                 ),
                 cover_path=cue_cover["cover"],
             )
             for cue_cover in self.find_cue_cover(
-                job_spec.config.src_path
-                if job_spec.config.src_path.is_dir()
-                else job_spec.config.src_path.parent
+                config.src_path if config.src_path.is_dir() else config.src_path.parent
             )
             if (
                 cue_tracks := CueParser.from_file(
                     file_path=(
                         cue_cover["cue"]
-                        if job_spec.config.src_path.is_dir()
-                        else job_spec.config.src_path
+                        if config.src_path.is_dir()
+                        else config.src_path
                     ),
-                    cue_encoding=job_spec.config.cue_encoding,
+                    cue_encoding=config.cue_encoding,
                 )
             )[1]
         ]
-        self.job_spec = job_spec
-        self.sox_props = job_spec.sox_props
 
-    def prepare_jobs(self):
+    def get_cue_sheet_jobs(self):
         """
-        Generate output directories/filenames according to format_spec
-        verify cuesheet referenced files exist and are supported by SoX
-        convert timestamps
-        assign SoX cmdline to each track
+        Generate output directories/filenames according to naming_spec
+        Verify cuesheet referenced files exist and are supported by SoX
+        Convert timestamps
+        Assign SoX cmdlines to tracks
         """
         for cue_sheet in self.cue_sheets:
             tracks = cue_sheet.tracks
@@ -204,13 +198,13 @@ class SoxJobs:
 
                 track.dst_path = (
                     (
-                        self.job_spec.config.dst_dir
-                        if self.job_spec.config.dst_dir
+                        self.config.dst_dir
+                        if self.config.dst_dir
                         else cue_sheet.cue_path.parent.joinpath("tracks")
                     )
                     .joinpath(
                         directory_name,
-                        f"{output_filenames[idx]}.{self.job_spec.config.dst_aformat}",
+                        f"{output_filenames[idx]}.{self.config.enc_format}",
                     )
                     .absolute()
                 )
@@ -257,17 +251,17 @@ class SoxJobs:
 
     def convert_spec(self, track: TrackProperties, cue_sheet: CueSheet) -> str:
         """
-        Replace format_spec by appropriate CueMetaData and TrackProperties values
-        Replace unsafe characters by --
+        Replace naming_spec with the appropriate CueMetaData and TrackProperties values
+        Replace unsafe characters with --
         """
 
         def chars_re(string: str) -> str:
             return re.sub(r"[/\\?%*:|\"<>\x7F\x00-\x1F]", "--", string)
 
-        format_spec = self.job_spec.config.format_spec
+        naming_spec = self.config.naming_spec
 
         return [
-            format_spec := format_spec.replace(a, b)
+            naming_spec := naming_spec.replace(a, b)
             for a, b in [
                 ("#a", chars_re(cue_sheet.metadata.title)),
                 ("#c", chars_re(cue_sheet.metadata.performer)),
@@ -282,9 +276,6 @@ class SoxJobs:
     def find_cue_cover(src_dir: Path) -> Iterator[dict[str, Path | None]]:
         """
         Search for .cue and covers in src_path
-        take the first .cue file found
-        take the first cover/folder/front.jpg/.jpeg/.png file found or None
-        yield nothing if no .cue files found
         """
         for root, _, files in os.walk(src_dir):
             if any(Path(file).suffix.lower() == ".cue" for file in files):

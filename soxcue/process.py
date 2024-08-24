@@ -1,3 +1,7 @@
+"""
+soxcue process
+"""
+
 import os
 import re
 from concurrent.futures import (
@@ -15,7 +19,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.columns import Columns
 from rich.live import Live
-from soxcue.sox_jobs import CueSheet, JobSpec
+from soxcue.sox_jobs import CueSheet, Config
 from soxcue.parser import TrackProperties
 
 
@@ -24,10 +28,25 @@ class SoxExecutionError(Exception):
 
 
 class SoxCueProcess:
+    """
+    Main process and UI
+    """
 
-    def __init__(self, cue_sheets: list[CueSheet], job_spec: JobSpec, console: Console):
+    def __init__(
+        self,
+        cue_sheets: list[CueSheet],
+        config: Config,
+        console: Console,
+    ):
+        """
+        For each CUE sheet in the list:
+        Prepare album level tags
+        Start the process
+        """
 
-        self.job_spec = job_spec
+        self.config = config
+        self.cmd_comments = config.get_comments_dict()
+
         for cue_sheet in cue_sheets:
 
             self.tagging = {}
@@ -70,17 +89,21 @@ class SoxCueProcess:
             self.process_sheet(cue_sheet, console)
 
     def process_sheet(self, cue_sheet: CueSheet, console: Console) -> None:
+        """
+        Run splitting jobs
+        Update UI status
+        """
 
+        # set up a new panel for the CUE sheet
         panel_title = f"{cue_sheet.metadata.performer} - {cue_sheet.metadata.title}"
         with Live(console=console, auto_refresh=False) as live:
-            text = self.get_main_text(cue_sheet, self.job_spec)
+            text = self.get_general_info(cue_sheet, self.config)
 
-            if self.job_spec.config.time_wait > 0:
+            # update UI counter
+            if self.config.time_wait > 0:
                 time_text = text.copy()
-                for x in range(self.job_spec.config.time_wait):
-                    time_text.append(
-                        f"Starting in: {self.job_spec.config.time_wait - x}\n"
-                    )
+                for x in range(self.config.time_wait):
+                    time_text.append(f"Starting in: {self.config.time_wait - x}\n")
                     live.update(
                         self.refresh_panel(time_text, panel_title),
                         refresh=True,
@@ -89,6 +112,8 @@ class SoxCueProcess:
                     time_text = text.copy()
 
             live.update(self.refresh_panel(text, panel_title), refresh=True)
+
+            # run the jobs
             cue_sheet.tracks[0].dst_path.parent.mkdir(parents=True, exist_ok=True)
 
             with ProcessPoolExecutor(os.cpu_count()) as ex:
@@ -153,10 +178,7 @@ class SoxCueProcess:
         """
         self.tagging["cue_meta"] = dict(cue_meta)
         tags = MediaFile(track.dst_path)
-        tags.album = re.split(
-            r"\s\(.+\)$",
-            self.tagging["cue_meta"].pop("title")
-        )[0]
+        tags.album = re.split(r"\s\(.+\)$", self.tagging["cue_meta"].pop("title"))[0]
         tags.artist = (
             track.performer
             if track.performer != "Unknown Artist"
@@ -176,17 +198,20 @@ class SoxCueProcess:
             f"{k.upper()}: {v}"
             for k, v in {
                 **self.tagging["cue_meta"],
-                **self.job_spec.get_comments_dict(),
+                **self.cmd_comments,
             }.items()
-        )
+        )  # convert back from dict
         tags.save()
 
     @staticmethod
-    def get_main_text(cue_sheet: CueSheet, job_spec: JobSpec) -> Text:
+    def get_general_info(cue_sheet: CueSheet, config: Config) -> Text:
+        """
+        General info rich text
+        """
 
         output_dir = (
-            job_spec.config.dst_dir.joinpath(cue_sheet.tracks[0].dst_path.parent)
-            if job_spec.config.dst_dir
+            config.dst_dir.joinpath(cue_sheet.tracks[0].dst_path.parent)
+            if config.dst_dir
             else cue_sheet.tracks[0].dst_path.parent
         )
 
@@ -202,12 +227,15 @@ class SoxCueProcess:
 
     @staticmethod
     def get_duration(seconds: float) -> str:
+        """
+        Convert seconds count into timestamp
+        """
 
         return str(timedelta(seconds=int(seconds)))
 
     @staticmethod
     def sox_process(sox_cmd: str) -> None:
         """
-        Run SoX process
+        Execute SoX process
         """
         run(sox_cmd, shell=True, check=True, stderr=STDOUT)
