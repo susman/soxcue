@@ -66,6 +66,10 @@ class CueSheet:
 
 @dataclass
 class Config:
+    """
+    Job config from cmdline/defaults
+    """
+
     src_path: Path
     dst_dir: Path | None
     time_wait: int
@@ -78,13 +82,16 @@ class Config:
 @dataclass
 class JobSpec:
     """
-    Current job definition
+    Current job spec
     """
 
     sox_props: SoxProperties
     config: Config
 
     def get_comments_dict(self) -> dict:
+        """
+        Comments from cmdline args
+        """
         if self.config.cmd_comment:
             comments = re.split(r"([A-Z]*:\s)", self.config.cmd_comment)[1:]
             return {
@@ -96,7 +103,7 @@ class JobSpec:
 
 class SoxJobs:
     """
-    Generate appropriate SoX command lines
+    Generate SoX cmd args
     """
 
     def __init__(
@@ -105,8 +112,8 @@ class SoxJobs:
     ):
         """
         Verify requested destination format is supported
-        verify input path exists
-        generate CueSheet objects
+        Verify input path exists
+        Generate CueSheet objects
         """
 
         if job_spec.config.dst_aformat not in job_spec.sox_props.supported_formats:
@@ -118,7 +125,7 @@ class SoxJobs:
         if not job_spec.config.src_path.exists():
             raise SoxJobsError(f"Source path '{job_spec.src_path}' not found")
 
-        self.cue_sheets: list[CueSheet] = [
+        self.cue_sheets = [
             CueSheet(
                 metadata=cue_tracks[0],
                 tracks=cue_tracks[1],

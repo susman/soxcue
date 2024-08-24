@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+"""
+command line parser
+"""
 import signal
 import sys
 import argparse
@@ -19,11 +22,19 @@ class SoxCueError(Exception):
 
 
 def main() -> None:
+    """
+    parse cmd args
+    run the process
+    """
 
     console = Console()
 
     # pylint: disable=unused-argument
     def signal_handler(sig, frame) -> None:
+        """
+        handle ctrl+c
+        """
+        # clean up the screen
         console.show_cursor(show=True)
         sys.exit(0)
 
@@ -116,7 +127,12 @@ def main() -> None:
     )
 
     if os.system(f"command -v {sox_props.exe_name} 2>&1>/dev/null") != 0:
-        raise SoxCueError(f"{sox_props.exe_name} command not found\n")
+        # https://stackoverflow.com/a/377028
+        if not (
+            os.path.isfile(sox_props.exe_name)
+            and os.access(sox_props.exe_name, os.X_OK)
+        ):
+            raise SoxCueError(f"{sox_props.exe_name} command not found\n")
 
     config = Config(
         src_path=parsed.src_path,
@@ -132,6 +148,7 @@ def main() -> None:
         sox_props=sox_props,
         config=config,
     )
+
     if config.src_path.is_dir():
         status = console.status("Searching for cue files\n")
         status.start()
