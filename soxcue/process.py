@@ -183,9 +183,7 @@ class SoxCueProcess:
         # attempt to identify cat id in the album title
         catid_re = re.compile(r"\s[\(\[].*?[0-9]{2}.*?[\)\]]$")
         if re.search(catid_re, album_title):
-            catid = {
-                "CATID": re.findall(catid_re, album_title)[0].strip("()[] ")
-            }
+            catid = {"CATID": re.findall(catid_re, album_title)[0].strip("()[] ")}
             album_title = re.split(catid_re, album_title)[0]
 
         tags = MediaFile(track.dst_path)

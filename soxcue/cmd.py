@@ -66,6 +66,20 @@ def main() -> None:
         type=Path,
     )
     argparser.add_argument(
+        "-c",
+        "--comment",
+        help="additional comments in the format of 'KEY: VALUE NKEY: NVALUE'",
+        type=str,
+        default=None,
+    )
+    argparser.add_argument(
+        "-C",
+        "--compression-level",
+        help="SoX compression level. Default: SoX default",
+        type=float,
+        default=None,
+    )
+    argparser.add_argument(
         "-d",
         "--output-dir",
         help="path to an output directory. Default: <CUE sheet parent directory>/tracks",
@@ -94,32 +108,18 @@ def main() -> None:
         default="#c - #d - #a/#n - #p - #t",
     )
     argparser.add_argument(
-        "-w",
-        "--wait",
-        help="delay each CUE sheet processing by x seconds. Default: 5",
-        type=int,
-        default=5,
-    )
-    argparser.add_argument(
-        "-c",
-        "--comment",
-        help="additional comments in the format of 'KEY: VALUE NKEY: NVALUE'",
-        type=str,
-        default=None,
-    )
-    argparser.add_argument(
-        "-C",
-        "--compression-level",
-        help="SoX compression level. Default: SoX default",
-        type=float,
-        default=None,
-    )
-    argparser.add_argument(
         "-s",
         "--sox-exe",
         help="SoX command name (or full path to an executable). Default: sox",
         type=str,
         default="sox",
+    )
+    argparser.add_argument(
+        "-w",
+        "--wait",
+        help="delay each CUE sheet processing by x seconds. Default: 5",
+        type=int,
+        default=5,
     )
     parsed = argparser.parse_args()
 

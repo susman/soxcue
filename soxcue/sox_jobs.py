@@ -72,11 +72,11 @@ class Config:
 
     src_path: Path
     dst_dir: Path | None
+    cue_encoding: str | None
+    cmd_comment: str | None
     time_wait: int
     enc_format: str
     naming_spec: str
-    cue_encoding: str | None
-    cmd_comment: str | None
 
     def get_comments_dict(self) -> dict:
         """
@@ -85,8 +85,7 @@ class Config:
         if self.cmd_comment:
             comments = re.split(r"([A-Z]*:\s)", self.cmd_comment)[1:]
             return {
-                k.strip().strip(":"): v.strip()
-                for k, v in zip(comments[::2], comments[1::2])
+                k.strip(" :"): v.strip() for k, v in zip(comments[::2], comments[1::2])
             }
         return {}
 
@@ -171,6 +170,8 @@ class SoxJobs:
                 src_file = cue_sheet.cue_path.parent.joinpath(track.file).absolute()
 
                 if not src_file.is_file():
+                    # CUE sheet referenced file not found
+                    # try other SoX supported file formats
                     for aformat in self.sox_props.supported_formats:
                         if (
                             src_file := cue_sheet.cue_path.parent.joinpath(
@@ -179,6 +180,7 @@ class SoxJobs:
                         ).exists():
                             break
 
+                # nothing we can do
                 if not src_file.is_file():
                     raise SoxJobsError(
                         "Source file "
@@ -257,7 +259,7 @@ class SoxJobs:
         """
 
         def chars_re(string: str) -> str:
-            return re.sub(r"[/\\?%*:|\"<>\x7F\x00-\x1F]", "--", string)
+            return re.sub(r"[/\\?%*:|<>\x7F\x00-\x1F]", "--", string.replace('"', ""))
 
         naming_spec = self.config.naming_spec
 
