@@ -141,7 +141,7 @@ class SoxCueProcess:
                             for track in cue_sheet.tracks
                             if track.index == futures[future]
                         ][0],
-                        cue_meta=cue_sheet.metadata.__dict__,
+                        cue_meta=dict(cue_sheet.metadata.__dict__),
                     )
                     self.tracks_status[futures[future]]["status"] = "done"
                     live.update(
@@ -176,17 +176,28 @@ class SoxCueProcess:
         """
         Tag output file
         """
-        self.tagging["cue_meta"] = dict(cue_meta)
+
+        album_title = cue_meta.pop("title")
+        catid = {}
+
+        # attempt to identify cat id in the album title
+        catid_re = re.compile(r"\s[\(\[].*?[0-9]{2}.*?[\)\]]$")
+        if re.search(catid_re, album_title):
+            catid = {
+                "CATID": re.findall(catid_re, album_title)[0].strip("()[] ")
+            }
+            album_title = re.split(catid_re, album_title)[0]
+
         tags = MediaFile(track.dst_path)
-        tags.album = re.split(r"\s\(.+\)$", self.tagging["cue_meta"].pop("title"))[0]
+        tags.album = album_title
         tags.artist = (
             track.performer
             if track.performer != "Unknown Artist"
-            else self.tagging["cue_meta"]["performer"]
+            else cue_meta["performer"]
         )
-        tags.albumartist = self.tagging["cue_meta"].pop("performer")
-        tags.year = self.tagging["cue_meta"].pop("date")
-        tags.genre = self.tagging["cue_meta"].pop("genre")
+        tags.albumartist = cue_meta.pop("performer")
+        tags.year = cue_meta.pop("date")
+        tags.genre = cue_meta.pop("genre")
         tags.title = track.title
         tags.track = track.index
         tags.isrc = track.isrc
@@ -197,10 +208,11 @@ class SoxCueProcess:
         tags.comments = " ".join(
             f"{k.upper()}: {v}"
             for k, v in {
-                **self.tagging["cue_meta"],
+                **cue_meta,
+                **catid,
                 **self.cmd_comments,
             }.items()
-        )  # convert back from dict
+        )
         tags.save()
 
     @staticmethod
