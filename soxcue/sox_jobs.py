@@ -159,6 +159,7 @@ class SoxJobs:
                 for track in tracks
             ]
 
+            # support 1 directory level in naming_spec
             if len(output_filenames[0].split("/")) == 2:
                 directory_name = output_filenames[0].split("/")[0]
                 output_filenames = [x.split("/")[1] for x in output_filenames]

@@ -53,8 +53,8 @@ class CueParser:
     def parse_cue_sheet(self) -> tuple[CueMetaData, list[TrackProperties]]:
         """
         Parse cue sheet lines
-        Return CueSheet
         """
+
         cue_metadata = CueMetaData()
         tracks = []
 
