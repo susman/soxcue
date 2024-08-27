@@ -10,7 +10,7 @@ Features:
 - "cover, folder, front"."png, jpg, jpeg" file found next to CUE sheet will be used as a cover image
 - [rich](https://github.com/Textualize/rich) based status UI
 - [chardet](https://github.com/chardet/chardet) based CUE sheet decoding
-- Multiprocessing (*n CPUs) for tracks extraction
+- Multiprocessing (*CPUs - 1) for tracks extraction
 - Preserves any REM (other than GENRE and DATE) commands as comments
 - Output directory and filename templating
 - `src_path` can be either a directory or a CUE sheet file

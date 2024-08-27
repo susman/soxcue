@@ -6,15 +6,19 @@ Command line parser
 import argparse
 import shutil
 import signal
-import sys
+import os
 import textwrap
 from pathlib import Path
-from rich.traceback import install
 from rich.console import Console
-from soxcue.sox_jobs import SoxJobs, SoxProperties, Config
-from soxcue.process import SoxCueProcess
-
-install(show_locals=True)
+from soxcue.config import (
+    SoxProperties,
+    ConfigInput,
+    ConfigOutput,
+    ConfigRuntime,
+    Config,
+)
+from soxcue.process import SoxcueProcess
+from soxcue.sheets import SoxcueSheets
 
 
 class SoxcueError(Exception):
@@ -37,7 +41,7 @@ def main() -> None:
         """
         # take cli cursor back from rich
         console.show_cursor(show=True)
-        sys.exit(0)
+        os._exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -126,29 +130,34 @@ def main() -> None:
     if not shutil.which(parsed.sox_exe):
         raise SoxcueError(f"{parsed.sox_exe} command not found\n")
 
-    sox_props = SoxProperties(
-        exe_name=parsed.sox_exe,
-        comp_level=parsed.compression_level,
-    )
     config = Config(
-        src_path=parsed.src_path,
-        cmd_comment=parsed.comment,
-        dst_dir=parsed.output_dir,
-        cue_encoding=parsed.encoding,
-        enc_format=parsed.format,
-        naming_spec=parsed.naming_spec,
-        time_wait=parsed.wait,
+        input_=ConfigInput(src_path=parsed.src_path),
+        output_=ConfigOutput(
+            dst_dir=parsed.output_dir,
+            cmd_comment=parsed.comment,
+            enc_format=parsed.format,
+        ),
+        runtime_=ConfigRuntime(
+            cue_encoding=parsed.encoding,
+            time_wait=parsed.wait,
+            naming_spec=parsed.naming_spec,
+            sox=SoxProperties(
+                exe_name=parsed.sox_exe,
+                comp_level=parsed.compression_level,
+            ),
+        ),
     )
 
-    if config.src_path.is_dir():
+    if config.input_.src_path.is_dir():
         status = console.status("Searching for cue files\n")
         status.start()
-        cue_sheets = SoxJobs(sox_props=sox_props, config=config).get_cue_sheet_jobs()
+        cue_sheets = SoxcueSheets(config=config).cue_sheets
         status.stop()
     else:
-        cue_sheets = SoxJobs(sox_props=sox_props, config=config).get_cue_sheet_jobs()
+        cue_sheets = SoxcueSheets(config=config).cue_sheets
 
-    SoxCueProcess(cue_sheets=cue_sheets, config=config, console=console)
+    for cue_sheet in cue_sheets:
+        SoxcueProcess(cue_sheet=cue_sheet, config=config)
 
 
 if __name__ == "__main__":
