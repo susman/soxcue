@@ -66,14 +66,14 @@ class CueParser:
                     setattr(
                         cue_metadata,
                         cue_line[2].partition(" ")[0].strip().lower(),
-                        cue_line[2].partition(" ")[2].strip().replace('"', ""),
+                        cue_line[2].partition(" ")[2].strip('" '),
                     )
                     continue
                 if cue_line[0] == "PERFORMER":
-                    cue_metadata.performer = cue_line[2].strip().replace('"', "")
+                    cue_metadata.performer = cue_line[2].strip('" ')
                     continue
                 if cue_line[0] == "TITLE":
-                    cue_metadata.title = cue_line[2].strip().replace('"', "")
+                    cue_metadata.title = cue_line[2].strip('" ')
                     continue
 
             if cue_line[0] == "FILE":
@@ -87,13 +87,13 @@ class CueParser:
                 track.file = current_file
                 tracks.append(track)
             elif cue_line[0] == "PERFORMER":
-                tracks[-1].performer = cue_line[2].replace('"', "").strip()
+                tracks[-1].performer = cue_line[2].strip('" ')
             elif cue_line[0] == "TITLE":
-                tracks[-1].title = cue_line[2].replace('"', "").strip()
+                tracks[-1].title = cue_line[2].strip('" ')
             elif cue_line[0] == "ISRC":
-                tracks[-1].isrc = cue_line[2].replace('"', "").strip()
+                tracks[-1].isrc = cue_line[2].strip('" ')
             elif cue_line[0] == "SONGWRITER":
-                tracks[-1].songwriter = cue_line[2].replace('"', "").strip()
+                tracks[-1].songwriter = cue_line[2].strip('" ')
             elif (
                 cue_line[0] == "INDEX"
                 and (timestamp := cue_line[2].partition(" "))[0] == "01"
@@ -107,7 +107,7 @@ class CueParser:
         file_path: str, cue_encoding: str = None
     ) -> tuple[CueMetaData, list[TrackProperties]]:
         """
-        Attempt to read a cue file and parse it
+        Attempt to read and parse CUE sheet from file
         """
         cue_file = Path(file_path).absolute()
 
@@ -119,9 +119,6 @@ class CueParser:
             try:
                 lines = fh.readlines()
             except UnicodeDecodeError as exc:
-                raise ParserError(
-                    "Couldn't decode cue sheet file, "
-                    "try to specify the encoding explicitly"
-                ) from exc
+                raise ParserError("Couldn't decode CUE sheet file") from exc
 
         return CueParser(lines).parse_cue_sheet()
